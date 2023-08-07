@@ -19,8 +19,7 @@ package com.mifmif.common.regex;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
-
-import com.mifmif.common.regex.util.Iterator;
+import java.util.Iterator;
 
 import dk.brics.automaton.State;
 import dk.brics.automaton.Transition;
@@ -31,7 +30,7 @@ import dk.brics.automaton.Transition;
  * @author y.mifrah
  *
  */
-public class GenerexIterator implements Iterator {
+public class GenerexIterator implements Iterator<String> {
 
 	private final Deque<Step> steps;
 	private final StringBuilder stringBuilder;
@@ -82,14 +81,6 @@ public class GenerexIterator implements Iterator {
 	}
 
 	/**
-	 * Always throws an {@link UnsupportedOperationException} (default behavior for Java 8).
-	 */
-	@Override
-	public void remove() {
-		throw new UnsupportedOperationException("remove");
-	}
-
-	/**
 	 * A step, in the iteration process, to build a string using {@code State}s.
 	 * <p>
 	 * It's responsible to keep the information of a {@code State}, like current char and transitions that need to be followed.
@@ -104,7 +95,7 @@ public class GenerexIterator implements Iterator {
 	 */
 	private static class Step {
 
-		private java.util.Iterator<Transition> iteratorTransitions;
+		private Iterator<Transition> iteratorTransitions;
 		private Transition currentTransition;
 		private char currentChar;
 

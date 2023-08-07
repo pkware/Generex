@@ -15,181 +15,157 @@
  */
 package com.mifmif.common.regex;
 
-import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
-
-import org.junit.Test;
-
 import dk.brics.automaton.Automaton;
 import dk.brics.automaton.State;
 import dk.brics.automaton.Transition;
+import org.junit.jupiter.api.Test;
+
+import static com.google.common.truth.Truth.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Unit test for {@code GenerexIterator}.
  */
 public class GenerexIteratorUnitTest {
 
-	@Test(expected = NullPointerException.class)
+	@Test
 	public void shouldFailToCreateIteratorWithUndefinedInitialState() {
-		// Given
-		State initialState = null;
-		// When
-		GenerexIterator iterator = new GenerexIterator(initialState);
-		// Then = NullPointerException
+		assertThrows(NullPointerException.class, () -> new GenerexIterator(null));
 	}
 
 	@Test
 	public void shouldNotHaveNextIfInitialStateIsNotAcceptedAndHasNoTransitions() {
-		// Given
-		State initialStateWithoutTranstions = new State();
-		GenerexIterator iterator = new GenerexIterator(initialStateWithoutTranstions);
-		// When
-		boolean hasNext = iterator.hasNext();
-		// Then
-		assertThat(hasNext, is(equalTo(false)));
+
+		State initialStateWithoutTransitions = new State();
+		GenerexIterator iterator = new GenerexIterator(initialStateWithoutTransitions);
+
+		assertThat(iterator.hasNext()).isFalse();
 	}
 
 	@Test
 	public void shouldHaveNextIfInitialStateIsAcceptedEvenIfHasNoTransitions() {
-		// Given
+
 		State acceptedState = new State();
 		acceptedState.setAccept(true);
 		GenerexIterator iterator = new GenerexIterator(acceptedState);
-		// When / Then
-		boolean hasNext = iterator.hasNext();
-		assertThat(hasNext, is(equalTo(true)));
-		String next = iterator.next();
-		assertThat(next, is(equalTo("")));
+
+		assertThat(iterator.hasNext()).isTrue();
+		assertThat(iterator.next()).isEqualTo("");
 	}
 
 	@Test
 	public void shouldNotHaveNextIfInitialStateHasJustTransitionToRejectedState() {
-		// Given
+
 		State initialState = new State();
 		State rejectedState = new State();
 		initialState.addTransition(new Transition('a', rejectedState));
 		GenerexIterator iterator = new GenerexIterator(initialState);
-		// When
-		boolean hasNext = iterator.hasNext();
-		// Then
-		assertThat(hasNext, is(equalTo(false)));
+		assertThat(iterator.hasNext()).isFalse();
 	}
 
 	@Test
 	public void shouldHaveNextIfInitialStateHasTransitionToAcceptedState() {
-		// Given
+
 		State initialState = new State();
 		State acceptedState = new State();
 		acceptedState.setAccept(true);
 		initialState.addTransition(new Transition('a', acceptedState));
 		GenerexIterator iterator = new GenerexIterator(initialState);
-		// When / Then
-		boolean hasNext = iterator.hasNext();
-		assertThat(hasNext, is(equalTo(true)));
-		String next = iterator.next();
-		assertThat(next, is(equalTo("a")));
+
+		assertThat(iterator.hasNext()).isTrue();
+		assertThat(iterator.next()).isEqualTo("a");
 	}
 
-	@Test(expected = IllegalStateException.class)
+	@Test
 	public void shouldFailToObtainNextIfDoesNotHaveNext() {
-		// Given
+
 		State rejectedInitialState = new State();
 		GenerexIterator iterator = new GenerexIterator(rejectedInitialState);
-		// When
-		String string = iterator.next();
-		// Then = IllegalStateException
+
+		assertThrows(IllegalStateException.class, iterator::next);
 	}
 
 	@Test
 	public void shouldReturnSameStringEvenIfHasNextIsCalledMultipleTimes() {
-		// Given
+
 		State initialState = Automaton.makeChar('a').union(Automaton.makeChar('b')).getInitialState();
 		GenerexIterator iterator = new GenerexIterator(initialState);
-		// When / Then
+
 		boolean hasNext = iterator.hasNext() & iterator.hasNext() & iterator.hasNext();
-		assertThat(hasNext, is(equalTo(true)));
-		String next = iterator.next();
-		assertThat(next, is(equalTo("a")));
+		assertThat(hasNext).isTrue();
+		assertThat(iterator.next()).isEqualTo("a");
 	}
 
 	@Test
 	public void shouldReturnFollowingStringsIfNextIsCalledMultipleTimes() {
-		// Given
+
 		State initialState = Automaton.makeChar('a').union(Automaton.makeChar('b')).getInitialState();
 		GenerexIterator iterator = new GenerexIterator(initialState);
-		// When
+
 		String next = iterator.next();
 		String followingNext = iterator.next();
-		// Then
-		assertThat(next, is(equalTo("a")));
-		assertThat(followingNext, is(equalTo("b")));
+
+		assertThat(next).isEqualTo("a");
+		assertThat(followingNext).isEqualTo("b");
 	}
 
 	@Test
 	public void shouldReturnFalseIfNoNextEvenIfHasNextIsCalledMultipleTimes() {
-		// Given
+
 		State initialState = Automaton.makeEmpty().getInitialState();
 		GenerexIterator iterator = new GenerexIterator(initialState);
-		// When
+
 		boolean hasNext = iterator.hasNext() | iterator.hasNext() | iterator.hasNext();
-		// Then
-		assertThat(hasNext, is(equalTo(false)));
+		assertThat(hasNext).isFalse();
 	}
 
 	@Test
 	public void shouldIteratorOverRangeOfChars() {
-		// Given
+
 		char min = Character.MIN_VALUE;
 		char max = Character.MAX_VALUE;
 		State initialState = Automaton.makeCharRange(min, max).getInitialState();
 		GenerexIterator iterator = new GenerexIterator(initialState);
-		// When / Then
+
 		for (int character = min; character <= max; character++) {
-			boolean hasNext = iterator.hasNext();
-			assertThat(hasNext, is(equalTo(true)));
-			String next = iterator.next();
-			assertThat(next, is(equalTo(createString((char) character, 1))));
+			assertThat(iterator.hasNext()).isTrue();
+			assertThat(iterator.next()).isEqualTo(createString((char) character, 1));
 		}
-		boolean hasNext = iterator.hasNext();
-		assertThat(hasNext, is(equalTo(false)));
+
+		assertThat(iterator.hasNext()).isFalse();
 	}
 
 	@Test
 	public void shouldIteratorOverCharWithVariableLength() {
-		// Given
+
 		char character = 'a';
 		int minLength = 1;
 		int maxLength = 15;
 		State initialState = Automaton.makeChar(character).repeat(minLength, maxLength).getInitialState();
 		GenerexIterator iterator = new GenerexIterator(initialState);
-		// When / Then
+
 		for (int count = minLength; count <= maxLength; count++) {
-			boolean hasNext = iterator.hasNext();
-			assertThat(hasNext, is(equalTo(true)));
-			String next = iterator.next();
-			assertThat(next, is(equalTo(createString(character, count))));
+			assertThat(iterator.hasNext()).isTrue();
+			assertThat(iterator.next()).isEqualTo(createString(character, count));
 		}
-		boolean hasNext = iterator.hasNext();
-		assertThat(hasNext, is(equalTo(false)));
+
+		assertThat(iterator.hasNext()).isFalse();
 	}
 
 	@Test
 	public void shouldIteratorOverInfiniteState() {
-		// Given
+
 		char character = 'a';
 		int max = 1000;
 		State initialState = Automaton.makeChar(character).repeat(1).getInitialState();
 		GenerexIterator iterator = new GenerexIterator(initialState);
-		// When / Then
+
 		for (int count = 1; count <= max; count++) {
-			boolean hasNext = iterator.hasNext();
-			assertThat(hasNext, is(equalTo(true)));
-			String next = iterator.next();
-			assertThat(next, is(equalTo(createString(character, count))));
+			assertThat(iterator.hasNext()).isTrue();
+			assertThat(iterator.next()).isEqualTo(createString(character, count));
 		}
-		boolean hasNext = iterator.hasNext();
-		assertThat(hasNext, is(equalTo(true)));
+
+		assertThat(iterator.hasNext()).isTrue();
 	}
 
 	private static String createString(char character, int length) {
