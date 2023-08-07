@@ -15,181 +15,131 @@
  */
 package com.mifmif.common.regex;
 
-import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.notNullValue;
-import static org.junit.Assert.assertThat;
-
-import org.junit.Test;
-
-import com.mifmif.common.regex.util.Iterator;
+import static com.google.common.truth.Truth.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import dk.brics.automaton.Automaton;
+import org.junit.jupiter.api.Test;
 
 /**
  * Unit test for {@code Generex}.
  */
 public class GenerexUnitTest {
 
-	@Test(expected = NullPointerException.class)
+	@Test
 	public void shouldFailToCreateAnInstanceWithUndefinedPattern() {
-		// Given
-		String undefinedPattern = null;
-		// When
-		Generex generex = new Generex(undefinedPattern);
-		// Then = NullPointerException
+		assertThrows(NullPointerException.class, () -> new Generex((String) null));
 	}
 
 	@Test
 	public void shouldNotFailToCreateAnInstanceWithUndefinedAutomaton() {
-		// Given
-		Automaton undefinedAutomaton = null;
-		// When
-		Generex generex = new Generex(undefinedAutomaton);
-		// Then
-		assertThat(generex, is(notNullValue()));
+		assertThat(new Generex((Automaton) null)).isNotNull();
 	}
 
 	@Test
 	public void shouldReturnTrueWhenQueryingIfInfiniteWithInfinitePattern() {
-		// Given
+
 		String infinitePattern = "a+";
 		Generex generex = new Generex(infinitePattern);
-		// When
-		boolean infinite = generex.isInfinite();
-		// Then
-		assertThat(infinite, is(equalTo(true)));
+
+		assertThat(generex.isInfinite()).isTrue();
 	}
 
 	@Test
 	public void shouldReturnFalseWhenQueryingIfInfiniteWithFinitePattern() {
-		// Given
+
 		String finitePattern = "a{5}";
 		Generex generex = new Generex(finitePattern);
-		// When
-		boolean infinite = generex.isInfinite();
-		// Then
-		assertThat(infinite, is(equalTo(false)));
+
+		assertThat(generex.isInfinite()).isFalse();
 	}
 
-	@Test(expected = Exception.class)
+	@Test
 	public void shouldFailWhenQueryingIfInfiniteWithUndefinedAutomaton() {
-		// Given
+
 		Generex generex = new Generex((Automaton) null);
-		// When
-		generex.isInfinite();
-		// Then = Exception
+		assertThrows(Exception.class, generex::isInfinite);
 	}
 
 	@Test
 	public void shouldReturnTrueWhenQueryingIfInfiniteWithInfiniteAutomaton() {
-		// Given
+
 		Automaton infiniteAutomaton = Automaton.makeChar('a').repeat(1); // same as "a+"
 		Generex generex = new Generex(infiniteAutomaton);
-		// When
-		boolean infinite = generex.isInfinite();
-		// Then
-		assertThat(infinite, is(equalTo(true)));
+
+		assertThat(generex.isInfinite()).isTrue();
 	}
 
 	@Test
 	public void shouldReturnFalseWhenQueryingIfInfiniteWithFiniteAutomaton() {
-		// Given
+
 		Automaton finiteAutomaton = Automaton.makeChar('a').repeat(5, 5); // same as "a{5}"
 		Generex generex = new Generex(finiteAutomaton);
-		// When
-		boolean infinite = generex.isInfinite();
-		// Then
-		assertThat(infinite, is(equalTo(false)));
+
+		assertThat(generex.isInfinite()).isFalse();
 	}
 
 	@Test
 	public void shouldReturnIteratorOfAPattern() {
-		// Given
+
 		Generex generex = new Generex("a");
-		// When
-		Iterator iterator = generex.iterator();
-		// Then
-		assertThat(iterator, is(notNullValue()));
+		assertThat(generex.iterator()).isNotNull();
 	}
 
 	@Test
 	public void shouldReturnIteratorOfAnAutomaton() {
-		// Given
+
 		Automaton finiteAutomaton = Automaton.makeChar('a');
 		Generex generex = new Generex(finiteAutomaton);
-		// When
-		Iterator iterator = generex.iterator();
-		// Then
-		assertThat(iterator, is(notNullValue()));
+
+		assertThat(generex.iterator()).isNotNull();
 	}
 
-	@Test(expected = NullPointerException.class)
+	@Test
 	public void shouldFailToReturnIteratorOfUndefinedAutomaton() {
-		// Given
+
 		Generex generex = new Generex((Automaton) null);
-		// When
-		generex.iterator();
-		// Then = NullPointerException
+		assertThrows(NullPointerException.class, generex::iterator);
 	}
 
-	@Test(expected = NullPointerException.class)
+	@Test
 	public void shouldFailToValidateUndefinedPattern() {
-		// Given
-		String undefinedPattern = null;
-		// When
-		Generex.isValidPattern(undefinedPattern);
-		// Then = NullPointerException
+		assertThrows(NullPointerException.class, () -> Generex.isValidPattern(null));
 	}
 
 	@Test
 	public void shouldReturnTrueWhenValidatingValidPattern() {
-		// Given
+
 		String validPattern = "[a-z0-9]{1,3}";
-		// When
-		boolean valid = Generex.isValidPattern(validPattern);
-		// Then
-		assertThat(valid, is(equalTo(true)));
+		assertThat(Generex.isValidPattern(validPattern)).isTrue();
 	}
 
 	@Test
 	public void shouldReturnTrueWhenValidatingValidPatternWithPredefinedClasses() {
-		// Given
+
 		String validPattern = "\\d{2,3}\\w{1}";
-		// When
-		boolean valid = Generex.isValidPattern(validPattern);
-		// Then
-		assertThat(valid, is(equalTo(true)));
+		assertThat(Generex.isValidPattern(validPattern)).isTrue();
 	}
 
 	@Test
 	public void shouldReturnFalseWhenValidatingInvalidPattern() {
-		// Given
+
 		String invalidPattern = "a)";
-		// When
-		boolean valid = Generex.isValidPattern(invalidPattern);
-		// Then
-		assertThat(valid, is(equalTo(false)));
+		assertThat(Generex.isValidPattern(invalidPattern)).isFalse();
 	}
 
 	@Test
 	public void shouldReturnFalseWhenValidatingPatternWithRepetitionsHigherThanMaxIntegerValue() {
-		// Given
-		String invalidPattern = "[a-z0-9]{" + ((long) Integer.MAX_VALUE + 1) + "}";
-		// When
-		boolean valid = Generex.isValidPattern(invalidPattern);
-		// Then
-		assertThat(valid, is(equalTo(false)));
+
+		String invalidPattern = "[a-z0-9]{" + (1L + Integer.MAX_VALUE) + "}";
+		assertThat(Generex.isValidPattern(invalidPattern)).isFalse();
 	}
 
 	@Test
 	public void shouldReturnFalseWhenValidatingPatternWithHigherNumberOfTransitions() {
-		// Given
+
 		String invalidPattern = createPatternWithTransitions(1000000);
-		// When
-		boolean valid = Generex.isValidPattern(invalidPattern);
-		// Then
-		assertThat(valid, is(equalTo(false)));
+		assertThat(Generex.isValidPattern(invalidPattern)).isFalse();
 	}
 
 	private static String createPatternWithTransitions(int numberOfTransitions) {

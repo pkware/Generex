@@ -1,79 +1,66 @@
 package com.mifmif.common.regex;
 
-import java.util.Arrays;
-import java.util.Collection;
+import kotlin.ranges.IntRange;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
-import org.junit.Assert;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
+import java.util.stream.Stream;
+
+import static com.google.common.truth.Truth.assertThat;
 
 /**
  * @author Myk Kolisnyk
  *
  */
-@RunWith(Parameterized.class)
 public class GenerexRandomTest {
 
-    private String pattern;
-    private int minLength;
-    private int maxLength;
-    
-    public GenerexRandomTest(String description,
-            String patternValue,
-            int minLengthValue,
-            int maxLengthValue) {
-        this.pattern = patternValue;
-        this.minLength = minLengthValue;
-        this.maxLength = maxLengthValue;
-    }
-    
-    @Parameters(name = "Test random: {0}")
-    public static Collection<Object[]> data() {
-        return Arrays.asList(new Object[][] {
-                {"Sample multicharacter expression","[A-Z]{5,9}", 4 , 8},
-                {"Sample expression","[0-3]([a-c]|[e-g]{1,2})", 1 , 3},
-                {"E-mail format","([a-z0-9]+)[@]([a-z0-9]+)[.]([a-z0-9]+)", 8 , 24},
-                {"Any number","(\\d+)", 4 , 8},
-                {"Any non-number","(\\D+)", 4 , 8},
-                {"Any word","(\\w+)", 4 , 8},
-                {"Any non-word","(\\W+)", 4 , 8},
-                {"Any text","(.*)", 4 , 8}
-        });
-    }
-    
-    @Test
-    public void testSimpleRandom() {
+    @ParameterizedTest
+    @MethodSource("arguments")
+    public void testSimpleRandom(String pattern, int unused1, int unused2) {
+
         Generex generex = new Generex(pattern);
-        String result = generex.random();
-        Assert.assertTrue(
-                String.format("The string '%s' doesn't match the '%s' pattern", result, pattern),
-                result.matches(pattern));
+        assertThat(generex.random()).matches(pattern);
     }
-    @Test
-    public void testRandomWithMinLength() {
+
+    @ParameterizedTest
+    @MethodSource("arguments")
+    public void testRandomWithMinLength(String pattern, int minLength, int unused) {
         Generex generex = new Generex(pattern);
         String result = generex.random(minLength);
-        Assert.assertTrue(
-                String.format("The string '%s' doesn't match the '%s' pattern", result, pattern),
-                result.matches(pattern));
-        Assert.assertTrue(
-                String.format("The string '%s' size doesn't fit the minimal size of %d", result, minLength),
-                result.length() >= minLength);
+
+        assertThat(result).matches(pattern);
+        assertThat(result.length()).isAtLeast(minLength);
     }
-    @Test
-    public void testRandomWithMaxLength() {
+
+    @ParameterizedTest
+    @MethodSource("arguments")
+    public void testRandomWithMaxLength(String pattern, int minLength, int maxLength) {
         Generex generex = new Generex(pattern);
         String result = generex.random(minLength, maxLength);
-        Assert.assertTrue(
-                String.format("The string '%s' doesn't match the '%s' pattern", result, pattern),
-                result.matches(pattern));
-        Assert.assertTrue(
-                String.format("The string '%s' size doesn't fit the minimal size of %d", result, minLength),
-                result.length() >= minLength);
-        Assert.assertTrue(
-                String.format("The string '%s' size doesn't fit the maximal size of %d", result, maxLength),
-                result.length() <= maxLength);
+
+        assertThat(result).matches(pattern);
+        assertThat(result.length()).isIn(new IntRange(minLength, maxLength));
+    }
+
+    static Stream<Arguments> arguments() {
+        return Stream.of(
+                // Sample multicharacter expression
+                Arguments.of("[A-Z]{5,9}", 4 , 8),
+                // Sample expression
+                Arguments.of("[0-3]([a-c]|[e-g]{1,2})", 1 , 3),
+                // E-mail format
+                Arguments.of("([a-z0-9]+)[@]([a-z0-9]+)[.]([a-z0-9]+)", 8 , 24),
+                // Any number
+                Arguments.of("(\\d+)", 4 , 8),
+                // Any non-number
+                Arguments.of("(\\D+)", 4 , 8),
+                // Any word
+                Arguments.of("(\\w+)", 4 , 8),
+                // Any non-word
+                Arguments.of("(\\W+)", 4 , 8),
+                // Any text
+                Arguments.of("(.*)", 4 , 8)
+        );
     }
 }

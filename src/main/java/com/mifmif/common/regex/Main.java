@@ -17,10 +17,6 @@
  */
 package com.mifmif.common.regex;
 
-//import java.util.List;
-
-import com.mifmif.common.regex.util.Iterator;
-
 /**
  * @author y.mifrah
  *
@@ -38,10 +34,9 @@ public class Main {
 		//List<String> matchedStrs = generex.getAllMatchedStrings();
 
 		// Using Generex iterator
-		Iterator iterator = generex.iterator();
-		while (iterator.hasNext()) {
-			System.out.print(iterator.next() + " ");
-		}
+        for (String s : generex) {
+            System.out.print(s + " ");
+        }
 		// it prints:
 		// 0a 0b 0c 0e 0ee 0ef 0eg 0f 0fe 0ff 0fg 0g 0ge 0gf 0gg
 		// 1a 1b 1c 1e 1ee 1ef 1eg 1f 1fe 1ff 1fg 1g 1ge 1gf 1gg
@@ -51,7 +46,5 @@ public class Main {
 		// Generate random String
 		String randomStr = generex.random();
 		System.out.println(randomStr);// a random value from the previous String
-										// list
-
 	}
 }
