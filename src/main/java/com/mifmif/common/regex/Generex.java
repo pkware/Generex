@@ -18,6 +18,11 @@
 
 package com.mifmif.common.regex;
 
+import dk.brics.automaton.Automaton;
+import dk.brics.automaton.RegExp;
+import dk.brics.automaton.State;
+import dk.brics.automaton.Transition;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -31,11 +36,6 @@ import java.util.Random;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import dk.brics.automaton.Automaton;
-import dk.brics.automaton.RegExp;
-import dk.brics.automaton.State;
-import dk.brics.automaton.Transition;
 
 /**
  * A Java utility class that help generating string values that match a given regular expression.It generate all values
@@ -64,9 +64,9 @@ public class Generex implements Iterable<String> {
      * The maximum length a produced string for an infinite regex if {@link #random(int, int)} hasn't been given a max
      * length other than {@link Integer#MAX_VALUE}.
      */
-	public static final int DEFAULT_INFINITE_MAX_LENGTH = 50;
+    public static final int DEFAULT_INFINITE_MAX_LENGTH = 50;
 
-	static {
+    static {
         Map<String, String> characterClasses = new HashMap<String, String>();
         characterClasses.put("\\\\d", "[0-9]");
         characterClasses.put("\\\\D", "[^0-9]");
@@ -104,9 +104,9 @@ public class Generex implements Iterable<String> {
      *
      * @param regex the regular expression used to build the {@code RegExp} instance
      * @return a {@code RegExp} instance for the given regular expression
-     * @throws NullPointerException if the given regular expression is {@code null}
+     * @throws NullPointerException     if the given regular expression is {@code null}
      * @throws IllegalArgumentException if an error occurred while parsing the given regular expression
-     * @throws StackOverflowError if the regular expression has to many transitions
+     * @throws StackOverflowError       if the regular expression has to many transitions
      * @see #PREDEFINED_CHARACTER_CLASSES
      * @see #isValidPattern(String)
      */
@@ -149,7 +149,7 @@ public class Generex implements Iterable<String> {
         String result = "";
         long passedStringNbr = 0;
         long step = node.getNbrMatchedString() / node.getNbrChar();
-        for (char usedChar = node.getMinChar(); usedChar <= node.getMaxChar(); ++ usedChar) {
+        for (char usedChar = node.getMinChar(); usedChar <= node.getMaxChar(); ++usedChar) {
             passedStringNbr += step;
             if (passedStringNbr >= indexOrder) {
                 passedStringNbr -= step;
@@ -229,7 +229,7 @@ public class Generex implements Iterable<String> {
     private void generate(String strMatch, State state, int limit) {
         if (matchedStringCounter == limit)
             return;
-        ++ matchedStringCounter;
+        ++matchedStringCounter;
         List<Transition> transitions = state.getSortedTransitions(true);
         if (transitions.size() == 0) {
             matchedStrings.add(strMatch);
@@ -239,7 +239,7 @@ public class Generex implements Iterable<String> {
             matchedStrings.add(strMatch);
         }
         for (Transition transition : transitions) {
-            for (char c = transition.getMin(); c <= transition.getMax(); ++ c) {
+            for (char c = transition.getMin(); c <= transition.getMax(); ++c) {
                 generate(strMatch + c, transition.getDest(), limit);
             }
         }
@@ -256,7 +256,7 @@ public class Generex implements Iterable<String> {
         List<Node> transactionNodes = new ArrayList<Node>();
         if (preparedTransactionNode == Integer.MAX_VALUE / 2)
             return transactionNodes;
-        ++ preparedTransactionNode;
+        ++preparedTransactionNode;
 
         if (state.isAccept()) {
             Node acceptedNode = new Node();
@@ -310,156 +310,153 @@ public class Generex implements Iterable<String> {
      * See {@link #random(int, int)}
      */
     public String random() {
-		return random(1);
+        return random(1);
     }
 
     /**
      * See {@link #random(int, int)}
      */
     public String random(int minLength) {
-		return random(minLength, automaton.isFinite() ? Integer.MAX_VALUE : DEFAULT_INFINITE_MAX_LENGTH);
+        return random(minLength, automaton.isFinite() ? Integer.MAX_VALUE : DEFAULT_INFINITE_MAX_LENGTH);
     }
 
-	/**
-	 * Attempts to generate a string that would match the regex stored by this {@link Generex} instance that has a
-	 * length in the range {@code [minLength, maxLength]}.
-	 * <p></p>
-	 * If the provided regex can't generate a matching string less than or equal to {@code maxLength}, then a random
-	 * string that matches the start of the regex will be generated with a length of {@code maxLength}. If the provided
-	 * regex can't generate a matching string greater than or equal to {@code minLength}, then a string with the maximum
-	 * length possible is returned.
-	 * <p></p>
-	 * When a string is generated that may be an infinite length, it is attempted to be randomly generated in a way
-	 * where repeated generations will produce a uniform distribution of lengths between `minLength` and `maxLength`. In
-	 * practice, the accuracy of this depends on the complexity of the regex.
-	 *
-	 * @param minLength Minimum wanted length of the generated string. The generated string may be smaller if the given
-	 * regex can't produce a string of the wanted length. Assumed to be less than or equal to {@code maxLength}.
-	 * @param maxLength Maximum wanted length of the generated string. The generated string <b>will be trimmed</b> to
-	 * this length if the regex can't generate a string less than this value. Assumed to be greater than or equal to
-     * {@code minLength}.
-	 * @return A string between {@code minLength} and {@code maxLength} if the regex provided can match a string in the
-     * given range. Otherwise, see the {@code minLength} and {@code maxLength} docs.
+    /**
+     * Attempts to generate a string that would match the regex stored by this {@link Generex} instance that has a
+     * length in the range {@code [minLength, maxLength]}.
+     * <p></p>
+     * If the provided regex can't generate a matching string less than or equal to {@code maxLength}, then a random
+     * string that matches the start of the regex will be generated with a length of {@code maxLength}. If the provided
+     * regex can't generate a matching string greater than or equal to {@code minLength}, then a string with the maximum
+     * length possible is returned.
+     * <p></p>
+     * When a string is generated that may be an infinite length, it is attempted to be randomly generated in a way
+     * where repeated generations will produce a uniform distribution of lengths between `minLength` and `maxLength`. In
+     * practice, the accuracy of this depends on the complexity of the regex.
      *
-	 */
-	public String random(int minLength, int maxLength) {
+     * @param minLength Minimum wanted length of the generated string. The generated string may be smaller if the given
+     *                  regex can't produce a string of the wanted length. Assumed to be less than or equal to {@code maxLength}.
+     * @param maxLength Maximum wanted length of the generated string. The generated string <b>will be trimmed</b> to
+     *                  this length if the regex can't generate a string less than this value. Assumed to be greater than or equal to
+     *                  {@code minLength}.
+     * @return A string between {@code minLength} and {@code maxLength} if the regex provided can match a string in the
+     * given range. Otherwise, see the {@code minLength} and {@code maxLength} docs.
+     */
+    public String random(int minLength, int maxLength) {
 
-		String result = prepareRandom("", automaton.getInitialState(), minLength, maxLength);
-		// Substring in case a length of 'maxLength + 1' is returned, which is possible if a smaller string can't be produced.
-		return result.substring(0, Math.min(maxLength, result.length()));
-	}
+        String result = prepareRandom("", automaton.getInitialState(), minLength, maxLength);
+        // Substring in case a length of 'maxLength + 1' is returned, which is possible if a smaller string can't be produced.
+        return result.substring(0, Math.min(maxLength, result.length()));
+    }
 
-	/**
-	 * Recursive function used to generate a regex as defined by {@link Generex#random(int, int)}.
-	 *
-	 * @param currentMatch A string built from the accumulation of previous transitions.
-	 * @param state Current state of the regex.
-	 * @param minLength Minimum wanted length of the produced string.
-	 * @param maxLength Maximum wanted length of produced string.
-	 * @return A string built from the accumulation of previous transitions.
-	 */
-	private String prepareRandom(String currentMatch, State state, int minLength, int maxLength) {
+    /**
+     * Recursive function used to generate a regex as defined by {@link Generex#random(int, int)}.
+     *
+     * @param currentMatch A string built from the accumulation of previous transitions.
+     * @param state        Current state of the regex.
+     * @param minLength    Minimum wanted length of the produced string.
+     * @param maxLength    Maximum wanted length of produced string.
+     * @return A string built from the accumulation of previous transitions.
+     */
+    private String prepareRandom(String currentMatch, State state, int minLength, int maxLength) {
 
-		// Return a string of length 'maxLength + 1' to indicate a dead branch.
-		if (currentMatch.length() > maxLength) return currentMatch;
+        // Return a string of length 'maxLength + 1' to indicate a dead branch.
+        if (currentMatch.length() > maxLength) return currentMatch;
 
-		if (state.isAccept() && shouldTerminate(currentMatch.length(), minLength, maxLength)) return currentMatch;
+        if (state.isAccept() && shouldTerminate(currentMatch.length(), minLength, maxLength)) return currentMatch;
 
-		// Make a copy so the original set is never modified.
-		Set<Transition> possibleTransitions = new HashSet<>(state.getTransitions());
-		int totalWeightedTransitions = calculateTotalWeightedTransitions(possibleTransitions);
+        // Make a copy so the original set is never modified.
+        Set<Transition> possibleTransitions = new HashSet<>(state.getTransitions());
+        int totalWeightedTransitions = calculateTotalWeightedTransitions(possibleTransitions);
 
-		String returnValue = currentMatch;
+        String returnValue = currentMatch;
 
-		while (!possibleTransitions.isEmpty()) {
+        while (!possibleTransitions.isEmpty()) {
 
-			Transition randomTransition = pickRandomWeightedTransition(possibleTransitions, totalWeightedTransitions);
-			int subTransitions = getWeightedTransitions(randomTransition);
-			totalWeightedTransitions -= subTransitions;
-			possibleTransitions.remove(randomTransition);
+            Transition randomTransition = pickRandomWeightedTransition(possibleTransitions, totalWeightedTransitions);
+            int subTransitions = getWeightedTransitions(randomTransition);
+            totalWeightedTransitions -= subTransitions;
+            possibleTransitions.remove(randomTransition);
 
-			char randomChar = (char) (random.nextInt(subTransitions) + randomTransition.getMin());
-			String result = prepareRandom(currentMatch + randomChar, randomTransition.getDest(), minLength, maxLength);
+            char randomChar = (char) (random.nextInt(subTransitions) + randomTransition.getMin());
+            String result = prepareRandom(currentMatch + randomChar, randomTransition.getDest(), minLength, maxLength);
 
-			// Greedily return the first valid result found.
-			if (minLength <= result.length() && result.length() <= maxLength) return result;
+            // Greedily return the first valid result found.
+            if (minLength <= result.length() && result.length() <= maxLength) return result;
 
-			// Continue to search for a valid result if the result is greater than the max length, or if the result is
-			// less than the minimum length. In the case a result never reaches the minimum length, return the longest
-			// match found.
-			if (returnValue.length() < result.length()) returnValue = result;
-		}
+            // Continue to search for a valid result if the result is greater than the max length, or if the result is
+            // less than the minimum length. In the case a result never reaches the minimum length, return the longest
+            // match found.
+            if (returnValue.length() < result.length()) returnValue = result;
+        }
 
-		return returnValue;
-	}
+        return returnValue;
+    }
 
-	/**
-	 * Attempts to randomly terminate regexes in a way where a uniform distribution of lengths is produced by initially
-	 * having a low probability of termination when close to the minimum length, and linearly increasing this
-	 * probability as a regex nears its maximum requested length.
-	 * <br>
-	 * In practice this doesn't work well when an infinitely repeating part of the regex is located in the middle with a
-	 * non-repeating terminal ending, but still works better than a flat chance of termination regardless of the range
-	 * of lengths requested.
-	 * <br>
-	 * It is assumed `maxLength` is not an absurdly large value, as this could allow the regex to grow extremely long,
-	 * and that `maxLength` is greater than `minLength`
-	 *
-	 * @param depth Size of the current string produced to match a regex.
-	 * @param minLength Minimum wanted length of the produced string.
-	 * @param maxLength Maximum wanted length of the produced string.
-	 *
-	 * @return Whether the current string should be returned as a match for the regex.
-	 */
-	private boolean shouldTerminate(int depth, int minLength, int maxLength) {
-		return depth >= minLength && random.nextInt(maxLength - depth + 1) == 0;
-	}
+    /**
+     * Attempts to randomly terminate regexes in a way where a uniform distribution of lengths is produced by initially
+     * having a low probability of termination when close to the minimum length, and linearly increasing this
+     * probability as a regex nears its maximum requested length.
+     * <br>
+     * In practice this doesn't work well when an infinitely repeating part of the regex is located in the middle with a
+     * non-repeating terminal ending, but still works better than a flat chance of termination regardless of the range
+     * of lengths requested.
+     * <br>
+     * It is assumed `maxLength` is not an absurdly large value, as this could allow the regex to grow extremely long,
+     * and that `maxLength` is greater than `minLength`
+     *
+     * @param depth     Size of the current string produced to match a regex.
+     * @param minLength Minimum wanted length of the produced string.
+     * @param maxLength Maximum wanted length of the produced string.
+     * @return Whether the current string should be returned as a match for the regex.
+     */
+    private boolean shouldTerminate(int depth, int minLength, int maxLength) {
+        return depth >= minLength && random.nextInt(maxLength - depth + 1) == 0;
+    }
 
-	/**
-	 * Returns a {@link Transition} from the given collection randomly based on the total number of characters that
-	 * {@link Transition} can produce.
-	 *
-	 * @param transitions Collection of transitions to choose from.
-	 * @param totalWeightedTransitions The sum of the total number of characters each transition could produce.
-	 *
-	 * @throws IllegalArgumentException When {@code totalWeightedTransitions} is not equal to the sum of all weighted
-	 * transitions in {@code transitions}.
-	 */
-	private Transition pickRandomWeightedTransition(Collection<Transition> transitions, int totalWeightedTransitions) {
+    /**
+     * Returns a {@link Transition} from the given collection randomly based on the total number of characters that
+     * {@link Transition} can produce.
+     *
+     * @param transitions              Collection of transitions to choose from.
+     * @param totalWeightedTransitions The sum of the total number of characters each transition could produce.
+     * @throws IllegalArgumentException When {@code totalWeightedTransitions} is not equal to the sum of all weighted
+     *                                  transitions in {@code transitions}.
+     */
+    private Transition pickRandomWeightedTransition(Collection<Transition> transitions, int totalWeightedTransitions) {
 
-		int value = random.nextInt(totalWeightedTransitions) + 1;
-		for (Transition transition : transitions) {
+        int value = random.nextInt(totalWeightedTransitions) + 1;
+        for (Transition transition : transitions) {
 
-			value -= getWeightedTransitions(transition);
-			if (value <= 0) return transition;
-		}
+            value -= getWeightedTransitions(transition);
+            if (value <= 0) return transition;
+        }
 
-		throw new IllegalArgumentException(
-				"totalWeightedTransitions was greater than the total number of weighted transitions in the supplied collection."
-		);
-	}
+        throw new IllegalArgumentException(
+                "totalWeightedTransitions was greater than the total number of weighted transitions in the supplied collection."
+        );
+    }
 
-	/**
-	 * Calculates the sum of all the {@link #getWeightedTransitions(Transition) weighted transitions} from the given collection.
-	 */
-	private static int calculateTotalWeightedTransitions(Collection<Transition> transitions) {
+    /**
+     * Calculates the sum of all the {@link #getWeightedTransitions(Transition) weighted transitions} from the given collection.
+     */
+    private static int calculateTotalWeightedTransitions(Collection<Transition> transitions) {
 
-		int totalWeight = 0;
-		for (Transition transition : transitions) totalWeight += getWeightedTransitions(transition);
+        int totalWeight = 0;
+        for (Transition transition : transitions) totalWeight += getWeightedTransitions(transition);
 
-		return totalWeight;
-	}
+        return totalWeight;
+    }
 
-	/**
-	 * Calculates the number of different characters a {@link Transition} could produce.
-	 */
-	private static int getWeightedTransitions(Transition transition) {
-		return transition.getMax() - transition.getMin() + 1;
-	}
+    /**
+     * Calculates the number of different characters a {@link Transition} could produce.
+     */
+    private static int getWeightedTransitions(Transition transition) {
+        return transition.getMax() - transition.getMin() + 1;
+    }
 
-	public Iterator<String> iterator() {
-		return new GenerexIterator(automaton.getInitialState());
-	}
+    public Iterator<String> iterator() {
+        return new GenerexIterator(automaton.getInitialState());
+    }
 
     /**
      * Tells whether or not the given regular expression is a valid pattern (for {@code Generex}).

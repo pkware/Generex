@@ -11,7 +11,6 @@ import static com.google.common.truth.Truth.assertThat;
 
 /**
  * @author Myk Kolisnyk
- *
  */
 public class GenerexRandomTest {
 
@@ -46,21 +45,21 @@ public class GenerexRandomTest {
     static Stream<Arguments> arguments() {
         return Stream.of(
                 // Sample multicharacter expression
-                Arguments.of("[A-Z]{5,9}", 4 , 8),
+                Arguments.of("[A-Z]{5,9}", 4, 8),
                 // Sample expression
-                Arguments.of("[0-3]([a-c]|[e-g]{1,2})", 1 , 3),
+                Arguments.of("[0-3]([a-c]|[e-g]{1,2})", 1, 3),
                 // E-mail format
-                Arguments.of("([a-z0-9]+)[@]([a-z0-9]+)[.]([a-z0-9]+)", 8 , 24),
+                Arguments.of("([a-z0-9]+)[@]([a-z0-9]+)[.]([a-z0-9]+)", 8, 24),
                 // Any number
-                Arguments.of("(\\d+)", 4 , 8),
+                Arguments.of("(\\d+)", 4, 8),
                 // Any non-number
-                Arguments.of("(\\D+)", 4 , 8),
+                Arguments.of("(\\D+)", 4, 8),
                 // Any word
-                Arguments.of("(\\w+)", 4 , 8),
+                Arguments.of("(\\w+)", 4, 8),
                 // Any non-word
-                Arguments.of("(\\W+)", 4 , 8),
+                Arguments.of("(\\W+)", 4, 8),
                 // Any text
-                Arguments.of("(.*)", 4 , 8)
+                Arguments.of("(.*)", 4, 8)
         );
     }
 }
