@@ -23,9 +23,9 @@ Generex is based on the library http://www.brics.dk/~amoeller/automaton/.
 If you use [Maven](http://maven.apache.org) you can include this library to your project by adding the following dependency: 
 ```xml
 <dependency>
-  <groupId>com.github.mifmif</groupId>
+  <groupId>com.pkware.mifmif</groupId>
   <artifactId>generex</artifactId>
-  <version>1.0.0</version>
+  <version>1.1.0</version>
 </dependency>
 ```
 
