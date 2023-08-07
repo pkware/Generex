@@ -4,7 +4,7 @@ plugins {
     signing
 }
 
-group = "com.pkware.mifmif"
+group = "com.pkware.generex"
 val generexVersion: String by project
 version = generexVersion
 
