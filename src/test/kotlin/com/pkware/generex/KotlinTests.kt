@@ -1,4 +1,4 @@
-package com.mifmif.common.regex
+package com.pkware.generex
 
 import com.google.common.truth.Truth.assertThat
 import org.junit.jupiter.api.Test
@@ -7,6 +7,7 @@ import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.MethodSource
 import org.junit.jupiter.params.provider.ValueSource
 import java.util.stream.Stream
+import kotlin.collections.iterator
 import kotlin.math.max
 import kotlin.math.min
 
