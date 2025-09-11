@@ -25,7 +25,7 @@ If you use [Maven](http://maven.apache.org) you can include this library to your
 <dependency>
   <groupId>com.pkware.generex</groupId>
   <artifactId>generex</artifactId>
-  <version>1.1.0</version>
+  <version>1.2.0</version>
 </dependency>
 ```
 
