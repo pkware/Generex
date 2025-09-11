@@ -61,6 +61,13 @@ public class Generex implements Iterable<String> {
     private boolean isTransactionNodeBuilt;
 
     /**
+     * Determined possible minimum and maximum length of a regex by traversing the
+     * Automaton tree using depth first search.
+     */
+    private Integer cachedMinLength;
+    private Integer cachedMaxLength;
+
+    /**
      * The maximum length a produced string for an infinite regex if {@link #random(int, int)} hasn't been given a max
      * length other than {@link Integer#MAX_VALUE}.
      */
@@ -317,7 +324,9 @@ public class Generex implements Iterable<String> {
      * See {@link #random(int, int)}
      */
     public String random(int minLength) {
-        return random(minLength, automaton.isFinite() ? Integer.MAX_VALUE : DEFAULT_INFINITE_MAX_LENGTH);
+        calculateLengthBounds();
+        int actualMaxLength = isInfinite() ? DEFAULT_INFINITE_MAX_LENGTH : cachedMaxLength;
+        return random(minLength, actualMaxLength);
     }
 
     /**
@@ -342,8 +351,21 @@ public class Generex implements Iterable<String> {
      * given range. Otherwise, see the {@code minLength} and {@code maxLength} docs.
      */
     public String random(int minLength, int maxLength) {
+        calculateLengthBounds();
 
-        String result = prepareRandom("", automaton.getInitialState(), minLength, maxLength);
+        // Calculate actual valid range by comparing the regex and the user defined bounds
+        int actualMinLength = Math.max(minLength, cachedMinLength);
+        int actualMaxLength = Math.min(maxLength, isInfinite() ? maxLength : cachedMaxLength);
+
+        // Pre-select target length uniformly from valid range
+        int targetLength;
+        if (actualMinLength > actualMaxLength) {
+            targetLength = actualMaxLength;
+        } else {
+            targetLength = actualMinLength + random.nextInt(actualMaxLength - actualMinLength + 1);
+        }
+
+        String result = prepareRandom("", automaton.getInitialState(), minLength, maxLength, targetLength);
         // Substring in case a length of 'maxLength + 1' is returned, which is possible if a smaller string can't be produced.
         return result.substring(0, Math.min(maxLength, result.length()));
     }
@@ -357,19 +379,26 @@ public class Generex implements Iterable<String> {
      * @param maxLength    Maximum wanted length of produced string.
      * @return A string built from the accumulation of previous transitions.
      */
-    private String prepareRandom(String currentMatch, State state, int minLength, int maxLength) {
+    private String prepareRandom(String currentMatch, State state, int minLength, int maxLength, int targetLength) {
 
         // Return a string of length 'maxLength + 1' to indicate a dead branch.
-        if (currentMatch.length() > maxLength) return currentMatch;
+        if (currentMatch.length() > maxLength || state.getTransitions().isEmpty()) return currentMatch;
 
-        if (state.isAccept() && shouldTerminate(currentMatch.length(), minLength, maxLength)) return currentMatch;
+        String returnValue = null;
+
+        if (state.isAccept()) {
+            // Set the current match to the value to return, just in case this would happen to be the cloest match to
+            // the target length.
+            returnValue = currentMatch;
+
+            if (currentMatch.length() == targetLength) return currentMatch;
+        }
 
         // Make a copy so the original set is never modified.
         Set<Transition> possibleTransitions = new HashSet<>(state.getTransitions());
         int totalWeightedTransitions = calculateTotalWeightedTransitions(possibleTransitions);
 
-        String returnValue = currentMatch;
-
+        // Will never start as empty due to the initial if statement in the function.
         while (!possibleTransitions.isEmpty()) {
 
             Transition randomTransition = pickRandomWeightedTransition(possibleTransitions, totalWeightedTransitions);
@@ -378,39 +407,88 @@ public class Generex implements Iterable<String> {
             possibleTransitions.remove(randomTransition);
 
             char randomChar = (char) (random.nextInt(subTransitions) + randomTransition.getMin());
-            String result = prepareRandom(currentMatch + randomChar, randomTransition.getDest(), minLength, maxLength);
+            String result = prepareRandom(currentMatch + randomChar, randomTransition.getDest(), minLength, maxLength, targetLength);
 
-            // Greedily return the first valid result found.
-            if (minLength <= result.length() && result.length() <= maxLength) return result;
+            // Greedily return the first valid result found that is of the wanted length..
+            if (result.length() == targetLength) return result;
 
-            // Continue to search for a valid result if the result is greater than the max length, or if the result is
-            // less than the minimum length. In the case a result never reaches the minimum length, return the longest
-            // match found.
-            if (returnValue.length() < result.length()) returnValue = result;
+            returnValue = getBestMatch(result, returnValue, minLength, maxLength, targetLength);
         }
 
         return returnValue;
     }
 
     /**
-     * Attempts to randomly terminate regexes in a way where a uniform distribution of lengths is produced by initially
-     * having a low probability of termination when close to the minimum length, and linearly increasing this
-     * probability as a regex nears its maximum requested length.
-     * <br>
-     * In practice this doesn't work well when an infinitely repeating part of the regex is located in the middle with a
-     * non-repeating terminal ending, but still works better than a flat chance of termination regardless of the range
-     * of lengths requested.
-     * <br>
-     * It is assumed `maxLength` is not an absurdly large value, as this could allow the regex to grow extremely long,
-     * and that `maxLength` is greater than `minLength`
+     * Determines if the new generation is better than the current generation.
+     * <p></p>
+     * The new generation is better if it is within the bounds and is closer to the target length than the current
+     * generation. Otherwise, the current generation is better.
      *
-     * @param depth     Size of the current string produced to match a regex.
-     * @param minLength Minimum wanted length of the produced string.
-     * @param maxLength Maximum wanted length of the produced string.
-     * @return Whether the current string should be returned as a match for the regex.
+     * @param newMatch the new generation to compare against the current generation.
+     * @param currentMatch the current generation.
+     * @param min minimum length of the generated string.
+     * @param max maximum length of the generated string.
+     * @param target the target length of the generated string.
+     * @return the best match between the new generation and the current generation.
      */
-    private boolean shouldTerminate(int depth, int minLength, int maxLength) {
-        return depth >= minLength && random.nextInt(maxLength - depth + 1) == 0;
+    private String getBestMatch(String newMatch, String currentMatch, int min, int max, int target) {
+
+        if (currentMatch == null) return newMatch;
+        if (newMatch.length() > max && currentMatch.length() > min) return currentMatch;
+
+        boolean newInRange = newMatch.length() >= min;
+        boolean currentInRange = currentMatch.length() >= min && currentMatch.length() <= max;
+
+        if (newInRange && !currentInRange) return newMatch;
+        if (currentInRange && !newInRange) return currentMatch;
+
+        int currentTargetDistance = Math.abs(currentMatch.length() - target);
+        int newTargetDistance = Math.abs(newMatch.length() - target);
+
+        if (newTargetDistance < currentTargetDistance) return newMatch;
+        return currentMatch;
+    }
+
+    /**
+     * Calculate the possible bounds of the generated string by traversing the regex
+     */
+    private void calculateLengthBounds() {
+        if (cachedMinLength != null) return;
+
+        int[] bounds = dfsLengthBounds(automaton.getInitialState(), new HashSet<>());
+        cachedMinLength = bounds[0];
+        cachedMaxLength = bounds[1];
+    }
+
+    /**
+     * Uses a depth first search to calculate the minimum and maximum length of the regex by
+     * traversing through the automaton tree.
+     * <br>
+     * We can use DFS because the automaton is finite (does not contain infinite loops) and
+     * we need to visit every state regardless to determine the longest length.
+     *
+     * @param state the current state of the automaton.
+     * @param visited the set of visited states.
+     * @return an int array containing the minimum and maximum length of the regex.
+     */
+    private int[] dfsLengthBounds(State state, Set<State> visited) {
+        if (visited.contains(state)) return new int[]{Integer.MAX_VALUE, 0};
+
+        int minLength = state.isAccept() ? 0 : Integer.MAX_VALUE;
+        int maxLength = 0;
+
+        visited.add(state);
+
+        for (Transition transition : state.getTransitions()) {
+            int[] bounds = dfsLengthBounds(transition.getDest(), visited);
+            if (bounds[0] != Integer.MAX_VALUE) {
+                minLength = Math.min(minLength, bounds[0] + 1);
+            }
+            maxLength = Math.max(maxLength, bounds[1] + 1);
+        }
+
+        visited.remove(state);
+        return new int[]{minLength, maxLength};
     }
 
     /**

@@ -93,6 +93,100 @@ class KotlinTests {
         assertThat(ratio).isLessThan(1.1)
     }
 
+    @Test
+    fun `ranges of group generate with a semi-uniform distribution`() {
+        val regex = "(abcde){1,5}"
+
+        val generex = Generex(regex)
+        val instancesMap = HashMap<String, Int>()
+
+        repeat(100_000) {
+
+            val result = generex.random(5, 25)
+            instancesMap[result] = instancesMap.getOrDefault(result, 0) + 1
+
+            assertThat(result).matches(regex)
+        }
+
+        val sortedKeys = instancesMap.keys.sortedBy { it.length }
+
+
+        // Bounds are uniformly distributed
+
+        var maxInstances = 0
+        var minInstances = Int.MAX_VALUE
+
+        println("Bounds:")
+        println("\t${sortedKeys.first()}: ${instancesMap[sortedKeys.first()]}")
+        maxInstances = max(maxInstances, instancesMap[sortedKeys.first()]!!)
+        minInstances = min(minInstances, instancesMap[sortedKeys.first()]!!)
+        println("\t${sortedKeys.last()}: ${instancesMap[sortedKeys.last()]}")
+        maxInstances = max(maxInstances, instancesMap[sortedKeys.last()]!!)
+        minInstances = min(minInstances, instancesMap[sortedKeys.last()]!!)
+
+        var ratio = 1.0 * maxInstances / minInstances
+        assertThat(ratio).isLessThan(1.1)
+
+
+        // Middle range is uniformly distributed
+
+        maxInstances = 0
+        minInstances = Int.MAX_VALUE
+
+        println("Middle Ranges:")
+        for (key in sortedKeys.subList(1, 4)) {
+            println("\t$key: ${instancesMap[key]}")
+            maxInstances = max(maxInstances, instancesMap[key]!!)
+            minInstances = min(minInstances, instancesMap[key]!!)
+        }
+
+        ratio = 1.0 * maxInstances / minInstances
+        assertThat(ratio).isLessThan(1.1)
+
+
+
+    }
+
+    @ParameterizedTest
+    @MethodSource("rangeUniformDistributionArgs")
+    fun `range regexes generate with uniform distributions`(regex: String) {
+
+        val generex = Generex(regex)
+        val instancesMap = HashMap<Int, Int>()
+
+        repeat(100_000) {
+
+            val result = generex.random()
+            instancesMap[result.length] = instancesMap.getOrDefault(result.length, 0) + 1
+
+            assertThat(result).matches(regex)
+        }
+
+        var maxInstances = 0
+        var minInstances = Int.MAX_VALUE
+
+        // Assumes all possible strings have actually been produced.
+        for ((key, instances) in instancesMap) {
+            println("$key: $instances")
+            maxInstances = max(maxInstances, instances)
+            minInstances = min(minInstances, instances)
+        }
+
+        val ratio = 1.0 * maxInstances / minInstances
+        assertThat(ratio).isLessThan(1.1)
+    }
+
+    @ParameterizedTest
+    @MethodSource("regexExceedsColumnValue")
+    fun `if regex must produce longer value, return value is trimmed`(
+        regex: String,
+        targetLength: Int,
+    ) {
+        val generated = Generex(regex).random(targetLength, targetLength)
+
+        assertThat(generated.length).isEqualTo(targetLength)
+    }
+
     companion object {
 
         @JvmStatic
@@ -130,6 +224,20 @@ class KotlinTests {
             Arguments.of("[a-ce-gr-ux-z]", 1, 1),
             Arguments.of("123a*", 1, 10),
             Arguments.of("123a*", 5, 10),
+            Arguments.of("a*123", 5, 20),
+        )
+
+        @JvmStatic
+        fun rangeUniformDistributionArgs() = Stream.of(
+            Arguments.of("\\d{1,5}"),
+            Arguments.of("\\d{1,10}"),
+        )
+
+        @JvmStatic
+        fun regexExceedsColumnValue() = Stream.of(
+            Arguments.of("(hi){3,5}", 7),
+            Arguments.of("aaa", 2),
+            Arguments.of("a{5,10}", 2),
         )
     }
 }
