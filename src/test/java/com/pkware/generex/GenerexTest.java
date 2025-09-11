@@ -1,4 +1,4 @@
-package com.mifmif.common.regex;
+package com.pkware.generex;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.mifmif.common.regex;
+package com.pkware.generex;
 
 import dk.brics.automaton.Automaton;
 import dk.brics.automaton.RegExp;
