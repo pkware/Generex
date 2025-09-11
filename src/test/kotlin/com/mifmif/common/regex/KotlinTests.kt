@@ -93,6 +93,35 @@ class KotlinTests {
         assertThat(ratio).isLessThan(1.1)
     }
 
+    @ParameterizedTest
+    @MethodSource("rangeUniformDistributionArgs")
+    fun `range regexes generate with uniform distributions`(regex: String) {
+
+        val generex = Generex(regex)
+        val instancesMap = HashMap<Int, Int>()
+
+        repeat(100_000) {
+
+            val result = generex.random()
+            instancesMap[result.length] = instancesMap.getOrDefault(result.length, 0) + 1
+
+            assertThat(result).matches(regex)
+        }
+
+        var maxInstances = 0
+        var minInstances = Int.MAX_VALUE
+
+        // Assumes all possible strings have actually been produced.
+        for ((key, instances) in instancesMap) {
+            println("$key: $instances")
+            maxInstances = max(maxInstances, instances)
+            minInstances = min(minInstances, instances)
+        }
+
+        val ratio = 1.0 * maxInstances / minInstances
+        assertThat(ratio).isLessThan(1.1)
+    }
+
     companion object {
 
         @JvmStatic
@@ -130,6 +159,12 @@ class KotlinTests {
             Arguments.of("[a-ce-gr-ux-z]", 1, 1),
             Arguments.of("123a*", 1, 10),
             Arguments.of("123a*", 5, 10),
+        )
+
+        @JvmStatic
+        fun rangeUniformDistributionArgs() = Stream.of(
+            Arguments.of("\\d{1,5}"),
+            Arguments.of("\\d{1,10}"),
         )
     }
 }
