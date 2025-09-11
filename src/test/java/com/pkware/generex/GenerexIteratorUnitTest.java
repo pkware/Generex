@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.mifmif.common.regex;
+package com.pkware.generex;
 
 import dk.brics.automaton.Automaton;
 import dk.brics.automaton.State;

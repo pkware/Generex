@@ -1,4 +1,4 @@
-package com.mifmif.common.regex;
+package com.pkware.generex;
 
 import kotlin.ranges.IntRange;
 import org.junit.jupiter.params.ParameterizedTest;
