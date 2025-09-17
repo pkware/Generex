@@ -160,6 +160,9 @@ class KotlinTests {
             Arguments.of("[a-ce-gr-ux-z]", 1, 1),
             Arguments.of("123a*", 1, 10),
             Arguments.of("123a*", 5, 10),
+            Arguments.of("a*123", 5, 20),
+            // Doesn't have to be included in this test, maybe have a unique test for this case
+            Arguments.of("(abcde){1,5}", 5, 25),
         )
 
         @JvmStatic

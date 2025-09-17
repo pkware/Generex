@@ -382,16 +382,23 @@ public class Generex implements Iterable<String> {
     private String prepareRandom(String currentMatch, State state, int minLength, int maxLength, int targetLength) {
 
         // Return a string of length 'maxLength + 1' to indicate a dead branch.
-        if (currentMatch.length() > maxLength) return currentMatch;
+        if (currentMatch.length() > maxLength || state.getTransitions().isEmpty()) return currentMatch;
 
-        if (state.isAccept() && shouldTerminate(currentMatch.length(), minLength, maxLength, targetLength)) return currentMatch;
+        String returnValue = null;
+
+        if (state.isAccept()) {
+            // Set the current match to the value to return, just in case this would happen to be the cloest match to
+            // the target length.
+            returnValue = currentMatch;
+
+            if (currentMatch.length() == targetLength) return currentMatch;
+        }
 
         // Make a copy so the original set is never modified.
         Set<Transition> possibleTransitions = new HashSet<>(state.getTransitions());
         int totalWeightedTransitions = calculateTotalWeightedTransitions(possibleTransitions);
 
-        String returnValue = currentMatch;
-
+        // Will never start as empty due to the initial if statement in the function.
         while (!possibleTransitions.isEmpty()) {
 
             Transition randomTransition = pickRandomWeightedTransition(possibleTransitions, totalWeightedTransitions);
@@ -402,37 +409,32 @@ public class Generex implements Iterable<String> {
             char randomChar = (char) (random.nextInt(subTransitions) + randomTransition.getMin());
             String result = prepareRandom(currentMatch + randomChar, randomTransition.getDest(), minLength, maxLength, targetLength);
 
-            // Greedily return the first valid result found.
-            if (minLength <= result.length() && result.length() <= maxLength) return result;
+            // Greedily return the first valid result found that is of the wanted length..
+            if (result.length() == targetLength) return result;
 
-            // Continue to search for a valid result if the result is greater than the max length, or if the result is
-            // less than the minimum length. In the case a result never reaches the minimum length, return the longest
-            // match found.
-            if (returnValue.length() < result.length()) returnValue = result;
+            returnValue = getBestMatch(result, returnValue, minLength, maxLength, targetLength);
         }
 
         return returnValue;
     }
 
-    /**
-     * Attempts to randomly terminate regexes in a way where a uniform distribution of lengths is produced by initially
-     * having a low probability of termination when close to the minimum length, and linearly increasing this
-     * probability as a regex nears its maximum requested length.
-     * <br>
-     * In practice this doesn't work well when an infinitely repeating part of the regex is located in the middle with a
-     * non-repeating terminal ending, but still works better than a flat chance of termination regardless of the range
-     * of lengths requested.
-     * <br>
-     * It is assumed `maxLength` is not an absurdly large value, as this could allow the regex to grow extremely long,
-     * and that `maxLength` is greater than `minLength`
-     *
-     * @param depth     Size of the current string produced to match a regex.
-     * @param minLength Minimum wanted length of the produced string.
-     * @param maxLength Maximum wanted length of the produced string.
-     * @return Whether the current string should be returned as a match for the regex.
-     */
-    private boolean shouldTerminate(int depth, int minLength, int maxLength, int targetLength) {
-        return depth >= minLength && (depth == targetLength || depth >= maxLength);
+    // TODO Docs. Discard current match if its > maxLength (indicates invalid match), discard match if its not in bounds, take the match that is closest to target.
+    private String getBestMatch(String newMatch, String currentMatch, int min, int max, int target) {
+
+        if (currentMatch == null) return newMatch;
+        if (newMatch.length() > max) return currentMatch;
+
+        boolean newInRange = newMatch.length() >= min;
+        boolean currentInRange = currentMatch.length() >= min && currentMatch.length() <= max;
+
+        if (newInRange && !currentInRange) return newMatch;
+        if (currentInRange && !newInRange) return currentMatch;
+
+        int currentTargetDistance = Math.abs(currentMatch.length() - target);
+        int newTargetDistance = Math.abs(newMatch.length() - target);
+
+        if (newTargetDistance < currentTargetDistance) return newMatch;
+        return currentMatch;
     }
 
     /**
