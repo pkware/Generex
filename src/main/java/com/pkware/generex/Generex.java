@@ -22,6 +22,7 @@ import dk.brics.automaton.Automaton;
 import dk.brics.automaton.RegExp;
 import dk.brics.automaton.State;
 import dk.brics.automaton.Transition;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -118,11 +119,108 @@ public class Generex implements Iterable<String> {
      * @see #isValidPattern(String)
      */
     private static RegExp createRegExp(String regex) {
-        String finalRegex = regex;
+        String finalRegex = convertToBricsRegex(regex);
         for (Entry<String, String> charClass : PREDEFINED_CHARACTER_CLASSES.entrySet()) {
             finalRegex = finalRegex.replaceAll(charClass.getKey(), charClass.getValue());
         }
         return new RegExp(finalRegex);
+    }
+
+    /**
+     * Converts a regex pattern to brics-compatible syntax for use with Generex.
+     *
+     * <p>Performs the following transformations:
+     * <ul>
+     *   <li>Removes an unescaped {@code ^} anchor at the start of the pattern, as brics treats
+     *       {@code ^} as a literal character rather than a start-of-input assertion.</li>
+     *   <li>Removes an unescaped {@code $} anchor at the end of the pattern, as brics treats
+     *       {@code $} as a literal character rather than an end-of-input assertion.</li>
+     *   <li>Converts non-capturing groups {@code (?:...)} to plain capturing groups {@code (...)},
+     *       since brics does not support non-capturing group syntax. This is a lossless
+     *       transformation because Generex only generates strings and never extracts capture
+     *       groups.</li>
+     * </ul>
+     *
+     * <p>The conversion is performed in a single pass that tracks escape sequences and character
+     * class boundaries to avoid incorrect replacements.
+     *
+     * @param regex The Java regex pattern to convert.
+     * @return the brics-compatible regex.
+     */
+    @NotNull
+    private static String convertToBricsRegex(@NotNull String regex) {
+        if (regex.isEmpty()) return regex;
+
+        StringBuilder result = new StringBuilder(regex.length());
+        boolean escaped = false;
+        boolean inCharClass = false;
+        int start = 0;
+
+        // Strip leading ^ anchor (not escaped since it's the first character)
+        if (regex.charAt(0) == '^') {
+            start = 1;
+        }
+
+        for (int i = start; i < regex.length(); i++) {
+            char c = regex.charAt(i);
+
+            if (escaped) {
+                result.append(c);
+                escaped = false;
+                continue;
+            }
+
+            if (c == '\\') {
+                result.append(c);
+                escaped = true;
+                continue;
+            }
+
+            if (inCharClass) {
+                if (c == ']') inCharClass = false;
+                result.append(c);
+                continue;
+            }
+
+            if (c == '[') {
+                inCharClass = true;
+                result.append(c);
+                int next = i + 1;
+                // Per regex standard, ] right after [ or [^ is a literal ] inside the class, not the closing bracket.
+                if (next < regex.length() && regex.charAt(next) == '^') {
+                    result.append('^');
+                    next++;
+                }
+                if (next < regex.length() && regex.charAt(next) == ']') {
+                    result.append(']');
+                    i = next;
+                }
+                continue;
+            }
+
+            // Convert (?:...) to (...) — only outside character classes and not escaped
+            if (c == '(' && i + 2 < regex.length() && regex.charAt(i + 1) == '?' && regex.charAt(i + 2) == ':') {
+                result.append('(');
+                i += 2;
+                continue;
+            }
+
+            result.append(c);
+        }
+
+        // Strip trailing $ anchor if the last character is an unescaped $
+        if (result.length() > 0 && result.charAt(result.length() - 1) == '$') {
+            // Count preceding backslashes — odd means $ is escaped, even means $ is an anchor
+            int backslashes = 0;
+            for (int i = result.length() - 2; i >= 0 && result.charAt(i) == '\\'; i--) {
+                backslashes++;
+            }
+            if (backslashes % 2 == 0) {
+                result.deleteCharAt(result.length() - 1);
+            }
+        }
+
+        return result.toString();
     }
 
     /**
@@ -365,9 +463,27 @@ public class Generex implements Iterable<String> {
             targetLength = actualMinLength + random.nextInt(actualMaxLength - actualMinLength + 1);
         }
 
-        String result = prepareRandom("", automaton.getInitialState(), minLength, maxLength, targetLength);
+        String result = prepareRandom("", automaton.getInitialState(), minLength, maxLength, targetLength, isInfinite() ? new AttemptBudget() : null);
         // Substring in case a length of 'maxLength + 1' is returned, which is possible if a smaller string can't be produced.
         return result.substring(0, Math.min(maxLength, result.length()));
+    }
+
+    /**
+     * Mutable counter shared by reference across recursive calls to {@link #prepareRandom},
+     * used to cap the total number of iterations and prevent exponential backtracking
+     * for infinite regexes.
+     */
+    private static class AttemptBudget {
+        private static final int MAX_ATTEMPTS = 1000;
+        int count = 0;
+
+        boolean isExhausted() {
+            return count >= MAX_ATTEMPTS;
+        }
+
+        void increment() {
+            count++;
+        }
     }
 
     /**
@@ -377,12 +493,18 @@ public class Generex implements Iterable<String> {
      * @param state        Current state of the regex.
      * @param minLength    Minimum wanted length of the produced string.
      * @param maxLength    Maximum wanted length of produced string.
+     * @param targetLength The desired length of the produced string, pre-selected uniformly from the valid range.
+     * @param budget       Shared attempt counter to limit recursion for infinite regexes, or {@code null} for finite regexes.
      * @return A string built from the accumulation of previous transitions.
      */
-    private String prepareRandom(String currentMatch, State state, int minLength, int maxLength, int targetLength) {
+    private String prepareRandom(String currentMatch, State state, int minLength, int maxLength, int targetLength, AttemptBudget budget) {
 
         // Return a string of length 'maxLength + 1' to indicate a dead branch.
         if (currentMatch.length() > maxLength || state.getTransitions().isEmpty()) return currentMatch;
+
+        // For infinite regexes, the automaton has cycles that can cause exponential recursion.
+        // This budget limit caps total recursive iterations to prevent hanging.
+        if (budget != null && budget.isExhausted()) return currentMatch;
 
         String returnValue = null;
 
@@ -400,6 +522,10 @@ public class Generex implements Iterable<String> {
 
         // Will never start as empty due to the initial if statement in the function.
         while (!possibleTransitions.isEmpty()) {
+            if (budget != null) {
+                budget.increment();
+                if (budget.isExhausted()) break;
+            }
 
             Transition randomTransition = pickRandomWeightedTransition(possibleTransitions, totalWeightedTransitions);
             int subTransitions = getWeightedTransitions(randomTransition);
@@ -407,7 +533,7 @@ public class Generex implements Iterable<String> {
             possibleTransitions.remove(randomTransition);
 
             char randomChar = (char) (random.nextInt(subTransitions) + randomTransition.getMin());
-            String result = prepareRandom(currentMatch + randomChar, randomTransition.getDest(), minLength, maxLength, targetLength);
+            String result = prepareRandom(currentMatch + randomChar, randomTransition.getDest(), minLength, maxLength, targetLength, budget);
 
             // Greedily return the first valid result found that is of the wanted length..
             if (result.length() == targetLength) return result;
@@ -415,7 +541,9 @@ public class Generex implements Iterable<String> {
             returnValue = getBestMatch(result, returnValue, minLength, maxLength, targetLength);
         }
 
-        return returnValue;
+        // For infinite regexes, if budget was exhausted before reaching an accept state, return currentMatch
+        // as a fallback instead of null.
+        return returnValue != null ? returnValue : currentMatch;
     }
 
     /**
