@@ -188,6 +188,83 @@ class KotlinTests {
         assertThat(generated.length).isEqualTo(targetLength)
     }
 
+    @ParameterizedTest
+    @MethodSource("infiniteRegexArgs")
+    fun `infinite regex does not hang`(regex: String) {
+        val generex = Generex(regex)
+        repeat(10) {
+            val result = generex.random()
+            assertThat(result).matches(regex)
+        }
+    }
+
+    @Test
+    fun `anchors are stripped from regex`() {
+        val regex = "^[A-Za-z]+$"
+        val generex = Generex(regex)
+        val result = generex.random()
+        assertThat(result).matches(regex)
+        assertThat(result).doesNotContain("^")
+        assertThat(result).doesNotContain("$")
+    }
+
+    @Test
+    fun `non-capturing groups are converted to plain groups`() {
+        val regex = "(?:abc)+"
+        val generex = Generex(regex)
+        val result = generex.random()
+        assertThat(result).matches(regex)
+    }
+
+    @Test
+    fun `escaped dollar sign at end is not stripped`() {
+        val regex = "abc\\$"
+        val generex = Generex(regex)
+        val result = generex.random()
+        assertThat(result).isEqualTo("abc$")
+    }
+
+    @Test
+    fun `escaped caret at start is not stripped`() {
+        val regex = "\\^abc"
+        val generex = Generex(regex)
+        val result = generex.random()
+        assertThat(result).isEqualTo("^abc")
+    }
+
+    @Test
+    fun `non-capturing group conversion skipped when escaped`() {
+        val generex = Generex("\\(?:")
+        assertThat(generex.random()).contains(":")
+    }
+
+    @Test
+    fun `non-capturing group conversion skipped inside character class`() {
+        val generex = Generex("[(?:]")
+        val result = generex.random()
+        assertThat(result).matches("[(?:]")
+    }
+
+    @Test
+    fun `non-capturing group conversion skipped when closing bracket is first char in character class`() {
+        val generex = Generex("[](?:]")
+        val result = generex.random()
+        assertThat(result).matches("[](?:]")
+    }
+
+    @Test
+    fun `non-capturing group conversion skipped when closing bracket is first char in negated character class`() {
+        val generex = Generex("[^](?:]")
+        val result = generex.random()
+        assertThat(result).matches("[^](?:]")
+    }
+
+    @Test
+    fun `escaped backslash before dollar sign is not stripped`() {
+        val generex = Generex("hello\\\\$")
+        assertThat(generex.random()).isEqualTo("hello\\")
+    }
+
     companion object {
 
         @JvmStatic
@@ -232,6 +309,15 @@ class KotlinTests {
         fun rangeUniformDistributionArgs() = Stream.of(
             Arguments.of("\\d{1,5}"),
             Arguments.of("\\d{1,10}"),
+        )
+
+        @JvmStatic
+        fun infiniteRegexArgs() = Stream.of(
+            Arguments.of("^[A-Za-z]+(?:[ '-][A-Za-z]+)*$"),
+            Arguments.of("[A-Za-z]+([ '-][A-Za-z]+)*"),
+            Arguments.of("(\\d{1,3}\\.){1,}\\d{1,3}"),
+            Arguments.of("[A-Z][a-z]*( [A-Z][a-z]*)*"),
+            Arguments.of("(a|b)+(c|d)*"),
         )
 
         @JvmStatic
