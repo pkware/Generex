@@ -265,6 +265,24 @@ class KotlinTests {
         assertThat(generex.random()).isEqualTo("hello\\")
     }
 
+    @ParameterizedTest
+    @MethodSource("longRegexes")
+    fun `generating from long bounded regexes does not hang`(regex: String) {
+        val generex = Generex(regex)
+        val times = mutableListOf<Long>()
+
+        repeat(100) {
+            val start = System.nanoTime()
+            val result = generex.random()
+            times.add(System.nanoTime() - start)
+
+            assertThat(result).matches(regex)
+        }
+
+        val averageMs = times.average() / 1_000_000
+        assertThat(averageMs).isLessThan(100.0)
+    }
+
     companion object {
 
         @JvmStatic
@@ -325,6 +343,12 @@ class KotlinTests {
             Arguments.of("(hi){3,5}", 7),
             Arguments.of("aaa", 2),
             Arguments.of("a{5,10}", 2),
+        )
+
+        @JvmStatic
+        fun longRegexes() = Stream.of(
+            Arguments.of("[a-zA-Z0-9]{1,100}"),
+            Arguments.of("[a-zA-Z0-9]{1,200}"),
         )
     }
 }
