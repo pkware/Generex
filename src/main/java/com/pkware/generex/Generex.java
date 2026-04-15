@@ -24,6 +24,7 @@ import dk.brics.automaton.State;
 import dk.brics.automaton.Transition;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -578,45 +579,95 @@ public class Generex implements Iterable<String> {
     }
 
     /**
-     * Calculate the possible bounds of the generated string by traversing the regex
+     * Calculate the possible bounds of the generated string by traversing the regex.
+     * <br>
+     * For finite automatons, both {@code cachedMinLength} and {@code cachedMaxLength} are populated.
+     * For infinite automatons the maximum length is undefined (the callers use
+     * {@link #DEFAULT_INFINITE_MAX_LENGTH} or the user-supplied {@code maxLength} instead), so only
+     * {@code cachedMinLength} is computed and {@code cachedMaxLength} is left {@code null}.
      */
     private void calculateLengthBounds() {
         if (cachedMinLength != null) return;
 
-        int[] bounds = dfsLengthBounds(automaton.getInitialState(), new HashSet<>());
-        cachedMinLength = bounds[0];
-        cachedMaxLength = bounds[1];
+        if (automaton.isFinite()) {
+            int[] bounds = dfsLengthBounds(automaton.getInitialState(), new HashMap<>());
+            cachedMinLength = bounds[0];
+            cachedMaxLength = bounds[1];
+        } else {
+            cachedMinLength = bfsMinLength(automaton.getInitialState());
+        }
     }
 
     /**
-     * Uses a depth first search to calculate the minimum and maximum length of the regex by
-     * traversing through the automaton tree.
+     * Uses a memoized depth first search to calculate the minimum and maximum length of the regex
+     * by traversing through the automaton.
      * <br>
-     * We can use DFS because the automaton is finite (does not contain infinite loops) and
-     * we need to visit every state regardless to determine the longest length.
+     * Assumes the automaton is finite (acyclic). Under that assumption each state's bounds depend
+     * only on the state itself, so results can be cached in {@code memo}. Without memoization,
+     * automatons shaped like a chain of states with multiple parallel transitions (e.g.
+     * {@code [a-zA-Z0-9]{1,100}}, which determinizes to ~3 range-transitions per state) would be
+     * explored along every path — exponential in the chain length. Memoization makes this linear
+     * in the number of states.
      *
      * @param state the current state of the automaton.
-     * @param visited the set of visited states.
+     * @param memo  cached bounds for states whose subtree has already been computed.
      * @return an int array containing the minimum and maximum length of the regex.
      */
-    private int[] dfsLengthBounds(State state, Set<State> visited) {
-        if (visited.contains(state)) return new int[]{Integer.MAX_VALUE, 0};
+    private int[] dfsLengthBounds(State state, Map<State, int[]> memo) {
+        int[] cached = memo.get(state);
+        if (cached != null) return cached;
 
         int minLength = state.isAccept() ? 0 : Integer.MAX_VALUE;
         int maxLength = 0;
 
-        visited.add(state);
-
         for (Transition transition : state.getTransitions()) {
-            int[] bounds = dfsLengthBounds(transition.getDest(), visited);
+            int[] bounds = dfsLengthBounds(transition.getDest(), memo);
             if (bounds[0] != Integer.MAX_VALUE) {
                 minLength = Math.min(minLength, bounds[0] + 1);
             }
             maxLength = Math.max(maxLength, bounds[1] + 1);
         }
 
-        visited.remove(state);
-        return new int[]{minLength, maxLength};
+        int[] result = {minLength, maxLength};
+        memo.put(state, result);
+        return result;
+    }
+
+    /**
+     * Computes the minimum length of any string the automaton accepts, via a breadth-first search
+     * from {@code initial} to the nearest accepting state.
+     * <br>
+     * Used for infinite (cyclic) automatons where the acyclic-memoized DFS assumption does not
+     * hold. Returns {@code 0} if {@code initial} itself is accepting. Returns
+     * {@link Integer#MAX_VALUE} if no accepting state is reachable (not expected for a valid regex).
+     *
+     * @param initial the state to search from.
+     * @return the shortest number of transitions needed to reach an accepting state.
+     */
+    private int bfsMinLength(State initial) {
+        Set<State> visited = new HashSet<>();
+        ArrayDeque<State> currentLevel = new ArrayDeque<>();
+        ArrayDeque<State> nextLevel = new ArrayDeque<>();
+
+        currentLevel.add(initial);
+        visited.add(initial);
+
+        int depth = 0;
+        while (!currentLevel.isEmpty()) {
+            for (State state : currentLevel) {
+                if (state.isAccept()) return depth;
+                for (Transition transition : state.getTransitions()) {
+                    State dest = transition.getDest();
+                    if (visited.add(dest)) nextLevel.add(dest);
+                }
+            }
+            ArrayDeque<State> tmp = currentLevel;
+            currentLevel = nextLevel;
+            nextLevel = tmp;
+            nextLevel.clear();
+            depth++;
+        }
+        return Integer.MAX_VALUE;
     }
 
     /**
