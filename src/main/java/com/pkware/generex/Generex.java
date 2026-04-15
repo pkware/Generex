@@ -63,15 +63,23 @@ public class Generex implements Iterable<String> {
     private boolean isTransactionNodeBuilt;
 
     /**
-     * Determined possible minimum and maximum length of a regex by traversing the
-     * Automaton tree using depth first search.
+     * Minimum length of any string this regex accepts. Populated on first access by
+     * {@link #calculateLengthBounds()}; {@code null} until then (doubles as the cache-populated flag).
      */
     private Integer cachedMinLength;
+
+    /**
+     * The regex's own upper bound on generated string length. Populated on first access by
+     * {@link #calculateLengthBounds()}. For infinite regexes this is {@link Integer#MAX_VALUE}
+     * (no natural cap) so that {@code Math.min(userMax, cachedMaxLength)} collapses to the user's
+     * value. Callers that need a default when the user supplied no max should use
+     * {@link #DEFAULT_INFINITE_MAX_LENGTH} instead for infinite regexes.
+     */
     private Integer cachedMaxLength;
 
     /**
-     * The maximum length a produced string for an infinite regex if {@link #random(int, int)} hasn't been given a max
-     * length other than {@link Integer#MAX_VALUE}.
+     * Fallback maximum length used by {@link #random(int)} (and overloads that delegate to it)
+     * when the regex is infinite and the caller did not supply their own {@code maxLength}.
      */
     public static final int DEFAULT_INFINITE_MAX_LENGTH = 50;
 
@@ -424,8 +432,10 @@ public class Generex implements Iterable<String> {
      */
     public String random(int minLength) {
         calculateLengthBounds();
-        int actualMaxLength = isInfinite() ? DEFAULT_INFINITE_MAX_LENGTH : cachedMaxLength;
-        return random(minLength, actualMaxLength);
+        // cachedMaxLength is Integer.MAX_VALUE for infinite regexes; fall back to the friendlier
+        // default since the caller didn't specify their own cap.
+        int defaultMaxLength = isInfinite() ? DEFAULT_INFINITE_MAX_LENGTH : cachedMaxLength;
+        return random(minLength, defaultMaxLength);
     }
 
     /**
@@ -452,9 +462,10 @@ public class Generex implements Iterable<String> {
     public String random(int minLength, int maxLength) {
         calculateLengthBounds();
 
-        // Calculate actual valid range by comparing the regex and the user defined bounds
+        // Calculate actual valid range by comparing the regex and the user defined bounds.
+        // For infinite regexes cachedMaxLength is Integer.MAX_VALUE, so the min() leaves maxLength alone.
         int actualMinLength = Math.max(minLength, cachedMinLength);
-        int actualMaxLength = Math.min(maxLength, isInfinite() ? maxLength : cachedMaxLength);
+        int actualMaxLength = Math.min(maxLength, cachedMaxLength);
 
         // Pre-select target length uniformly from valid range
         int targetLength;
@@ -581,10 +592,10 @@ public class Generex implements Iterable<String> {
     /**
      * Calculate the possible bounds of the generated string by traversing the regex.
      * <br>
-     * For finite automatons, both {@code cachedMinLength} and {@code cachedMaxLength} are populated.
-     * For infinite automatons the maximum length is undefined (the callers use
-     * {@link #DEFAULT_INFINITE_MAX_LENGTH} or the user-supplied {@code maxLength} instead), so only
-     * {@code cachedMinLength} is computed and {@code cachedMaxLength} is left {@code null}.
+     * For finite automatons, both {@code cachedMinLength} and {@code cachedMaxLength} are populated
+     * from the DFS. For infinite automatons, {@code cachedMinLength} is computed from a BFS to the
+     * nearest accepting state, and {@code cachedMaxLength} is set to {@link Integer#MAX_VALUE}
+     * (meaning "no natural upper bound").
      */
     private void calculateLengthBounds() {
         if (cachedMinLength != null) return;
@@ -595,6 +606,7 @@ public class Generex implements Iterable<String> {
             cachedMaxLength = bounds[1];
         } else {
             cachedMinLength = bfsMinLength(automaton.getInitialState());
+            cachedMaxLength = Integer.MAX_VALUE;
         }
     }
 
