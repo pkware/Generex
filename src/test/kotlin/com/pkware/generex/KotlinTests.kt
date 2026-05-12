@@ -6,6 +6,7 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.MethodSource
 import org.junit.jupiter.params.provider.ValueSource
+import java.util.regex.Pattern
 import java.util.stream.Stream
 import kotlin.collections.iterator
 import kotlin.math.max
@@ -283,6 +284,26 @@ class KotlinTests {
         assertThat(averageMs).isLessThan(100.0)
     }
 
+    @ParameterizedTest
+    @MethodSource("shorthandInsideBracketsArgs")
+    fun `shorthand class inside brackets honors Java regex semantics`(pattern: String) {
+        val generex = Generex(pattern)
+        repeat(100) {
+            val result = generex.random()
+            assertThat(result).matches(pattern)
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["\\S", "\\W", "\\D"])
+    fun `inverse shorthand inside brackets honors Java regex xsemantics`(inverseShorthand: String) {
+        val generex = Generex("[$inverseShorthand]")
+        val expected = Pattern.compile(inverseShorthand)
+        repeat(10_000) {
+            assertThat(generex.random()).matches(expected)
+        }
+    }
+
     companion object {
 
         @JvmStatic
@@ -349,6 +370,42 @@ class KotlinTests {
         fun longRegexes() = Stream.of(
             Arguments.of("[a-zA-Z0-9]{1,100}"),
             Arguments.of("[a-zA-Z0-9]{1,200}"),
+        )
+
+        @JvmStatic
+        fun shorthandInsideBracketsArgs() = Stream.of(
+            // Each positive shorthand alone in a class.
+            Arguments.of("[\\d]"),
+            Arguments.of("[\\s]"),
+            Arguments.of("[\\w]"),
+            // Each negative shorthand alone in a class. Brics treats the inner '^' as a literal,
+            // so the bug also corrupts these classes (extra '[', '^', ']' characters).
+            Arguments.of("[\\D]"),
+            Arguments.of("[\\S]"),
+            Arguments.of("[\\W]"),
+            // Shorthand at start, middle, and end of a class with literal neighbors.
+            Arguments.of("[\\dabc]"),
+            Arguments.of("[a\\dc]"),
+            Arguments.of("[abc\\d]"),
+            // Shorthand combined with explicit ranges.
+            Arguments.of("[\\dA-F]"),
+            Arguments.of("[A-F\\d]"),
+            Arguments.of("[A-Fa-f\\d]"),
+            // Multiple shorthands in a single class.
+            Arguments.of("[\\d\\w]"),
+            Arguments.of("[\\d\\s]"),
+            Arguments.of("[\\w\\W]"),
+            // Negated outer class containing a shorthand.
+            Arguments.of("[^\\d]"),
+            Arguments.of("[^\\w]"),
+            Arguments.of("[^a\\d]"),
+            // Quantified classes — the bug repeats the literal ']' under quantifier.
+            Arguments.of("[\\d]{1,4}"),
+            Arguments.of("[A-Fa-f\\d]{1,4}"),
+            Arguments.of("[\\d\\w]{2,5}"),
+            // Shorthand inside class adjacent to a literal sequence outside the class.
+            Arguments.of("prefix[\\d]suffix"),
+            Arguments.of("([\\d]){2,3}"),
         )
     }
 }
