@@ -27,13 +27,11 @@ import org.jetbrains.annotations.NotNull;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -48,14 +46,6 @@ import java.util.regex.Pattern;
  */
 public class Generex implements Iterable<String> {
 
-    /**
-     * The predefined character classes supported by {@code Generex}.
-     * <p>
-     * An immutable map containing as keys the character classes and values the equivalent regular expression syntax.
-     *
-     * @see #createRegExp(String)
-     */
-    private static final Map<String, String> PREDEFINED_CHARACTER_CLASSES;
     private RegExp regExp;
     private Automaton automaton;
     private List<String> matchedStrings = new ArrayList<String>();
@@ -83,17 +73,6 @@ public class Generex implements Iterable<String> {
      */
     public static final int DEFAULT_INFINITE_MAX_LENGTH = 50;
 
-    static {
-        Map<String, String> characterClasses = new HashMap<String, String>();
-        characterClasses.put("\\\\d", "[0-9]");
-        characterClasses.put("\\\\D", "[^0-9]");
-        characterClasses.put("\\\\s", "[ \t\n\f\r]");
-        characterClasses.put("\\\\S", "[^ \t\n\f\r]");
-        characterClasses.put("\\\\w", "[a-zA-Z_0-9]");
-        characterClasses.put("\\\\W", "[^a-zA-Z_0-9]");
-        PREDEFINED_CHARACTER_CLASSES = Collections.unmodifiableMap(characterClasses);
-    }
-
     public Generex(String regex) {
         this(regex, new Random());
     }
@@ -116,23 +95,16 @@ public class Generex implements Iterable<String> {
 
     /**
      * Creates a {@code RegExp} instance from the given regular expression.
-     * <p>
-     * Predefined character classes are replaced with equivalent regular expression syntax prior creating the instance.
      *
      * @param regex the regular expression used to build the {@code RegExp} instance
      * @return a {@code RegExp} instance for the given regular expression
      * @throws NullPointerException     if the given regular expression is {@code null}
      * @throws IllegalArgumentException if an error occurred while parsing the given regular expression
      * @throws StackOverflowError       if the regular expression has to many transitions
-     * @see #PREDEFINED_CHARACTER_CLASSES
      * @see #isValidPattern(String)
      */
     private static RegExp createRegExp(String regex) {
-        String finalRegex = convertToBricsRegex(regex);
-        for (Entry<String, String> charClass : PREDEFINED_CHARACTER_CLASSES.entrySet()) {
-            finalRegex = finalRegex.replaceAll(charClass.getKey(), charClass.getValue());
-        }
-        return new RegExp(finalRegex);
+        return new RegExp(convertToBricsRegex(regex));
     }
 
     /**
@@ -148,6 +120,12 @@ public class Generex implements Iterable<String> {
      *       since brics does not support non-capturing group syntax. This is a lossless
      *       transformation because Generex only generates strings and never extracts capture
      *       groups.</li>
+     *   <li>Expands the predefined shorthand classes {@code \d \D \s \S \w \W} into brics-native
+     *       character classes. Inside a {@code [...]} they expand to class-body form (e.g.
+     *       {@code \d -> 0-9}); outside a class they expand to the full bracketed form
+     *       ({@code \d -> [0-9]}). Negated shorthands inside a class expand to an explicit
+     *       complementary Unicode range, so {@code [a\D]} yields {@code [a} plus every
+     *       non-digit Unicode BMP codepoint.</li>
      * </ul>
      *
      * <p>The conversion is performed in a single pass that tracks escape sequences and character
@@ -180,6 +158,14 @@ public class Generex implements Iterable<String> {
             }
 
             if (c == '\\') {
+                if (i + 1 < regex.length()) {
+                    String expansion = expandShorthandClass(regex.charAt(i + 1), inCharClass);
+                    if (expansion != null) {
+                        result.append(expansion);
+                        i++;
+                        continue;
+                    }
+                }
                 result.append(c);
                 escaped = true;
                 continue;
@@ -194,15 +180,17 @@ public class Generex implements Iterable<String> {
             if (c == '[') {
                 inCharClass = true;
                 result.append(c);
+                // Per regex standard, ] right after [ or [^ is a literal ] inside the class, not
+                // the closing bracket. Only pre-consume ^ when it pairs with such a literal ];
+                // otherwise let the main loop handle ^ on its next iteration so it isn't appended
+                // twice.
                 int next = i + 1;
-                // Per regex standard, ] right after [ or [^ is a literal ] inside the class, not the closing bracket.
-                if (next < regex.length() && regex.charAt(next) == '^') {
-                    result.append('^');
-                    next++;
-                }
-                if (next < regex.length() && regex.charAt(next) == ']') {
+                boolean hasCaret = next < regex.length() && regex.charAt(next) == '^';
+                int closeCandidate = hasCaret ? next + 1 : next;
+                if (closeCandidate < regex.length() && regex.charAt(closeCandidate) == ']') {
+                    if (hasCaret) result.append('^');
                     result.append(']');
-                    i = next;
+                    i = closeCandidate;
                 }
                 continue;
             }
@@ -230,6 +218,31 @@ public class Generex implements Iterable<String> {
         }
 
         return result.toString();
+    }
+
+    /**
+     * Returns the brics-compatible expansion of a Java shorthand character class, or {@code null}
+     * if {@code shorthand} is not one of {@code d D s S w W}.
+     *
+     * <p>The expansion form depends on whether the caller is currently inside a {@code [...]}:
+     * inside a class it returns class-body form ({@code 0-9}) so it can be concatenated with
+     * other class members; outside a class it returns the bracketed form ({@code [0-9]}).
+     * Negative shorthands inside a class expand to explicit complementary Unicode BMP ranges,
+     * since brics character classes cannot mix negation with other set members.
+     */
+    private static String expandShorthandClass(char shorthand, boolean inCharClass) {
+        switch (shorthand) {
+            case 'd': return inCharClass ? "0-9" : "[0-9]";
+            case 'D': return inCharClass ? " -/:-￿" : "[^0-9]";
+            case 's': return inCharClass ? " \t\n\f\r" : "[ \t\n\f\r]";
+            case 'S': return inCharClass ? " --!-￿" : "[^ \t\n\f\r]";
+            case 'w': return inCharClass ? "a-zA-Z_0-9" : "[a-zA-Z_0-9]";
+            // Range \[-\^ covers the contiguous code points 0x5b-0x5e ('[', '\', ']', '^'); each
+            // endpoint is escaped because both ] and \ would otherwise be parsed by brics as
+            // structural characters inside the class.
+            case 'W': return inCharClass ? " -/:-@\\[-\\^`{-￿" : "[^a-zA-Z_0-9]";
+            default: return null;
+        }
     }
 
     /**
