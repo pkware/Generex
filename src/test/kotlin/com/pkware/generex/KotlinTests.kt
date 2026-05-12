@@ -1,6 +1,7 @@
 package com.pkware.generex
 
 import com.google.common.truth.Truth.assertThat
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
@@ -304,6 +305,51 @@ class KotlinTests {
         }
     }
 
+    // ─── LIMITATIONS.md regression tests ─────────────────────────────────────────────────────
+    //
+    // These lock in the currently-documented behavior for unsupported Java regex constructs.
+    // If one of them starts failing, either we accidentally fixed a limitation (update the doc)
+    // or we accidentally regressed (investigate).
+
+    @ParameterizedTest
+    @ValueSource(strings = [
+        "(?<name>abc)",  // named group — brics resolves <name> as a named automaton at build time
+        "\\p{L}",         // unicode property — brics tries to parse {L} as a quantifier
+        "abc\"def",      // unescaped double quote — brics treats " as literal-string delimiter
+    ])
+    fun `limitation patterns rejected by Generex constructor`(pattern: String) {
+        assertThrows(IllegalArgumentException::class.java) { Generex(pattern) }
+    }
+
+    @ParameterizedTest
+    @MethodSource("limitationSilentMismatchArgs")
+    fun `LIMITATIONS broken pattern misbehaves and the workaround fixes it`(
+        pattern: String,
+        workaround: String,
+    ) {
+        val broken = Generex(pattern)
+        repeat(100) {
+            // pattern in known limitations will not produce a valid generation
+            assertThat(broken.random()).doesNotMatch(pattern)
+        }
+
+        val fixed = Generex(workaround)
+        repeat(100) {
+            // workaround pattern will produce a valid generation
+            assertThat(fixed.random()).matches(pattern)
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("bricsSpecialEscapeArgs")
+    fun `brics-special characters can be escaped to produce the literal`(
+        pattern: String,
+        expected: String,
+    ) {
+        val generex = Generex(pattern)
+        assertThat(generex.random()).isEqualTo(expected)
+    }
+
     companion object {
 
         @JvmStatic
@@ -406,6 +452,42 @@ class KotlinTests {
             // Shorthand inside class adjacent to a literal sequence outside the class.
             Arguments.of("prefix[\\d]suffix"),
             Arguments.of("([\\d]){2,3}"),
+        )
+
+        @JvmStatic
+        fun limitationSilentMismatchArgs() = Stream.of(
+            // (brokenPattern, sampleSize, workaround) — workaround must be a brics-acceptable
+            // regex whose generated output also satisfies the brokenPattern under Java regex.
+            //
+            // Lookahead — brics doesn't recognize (?=, so `?=` leaks into output as literals.
+            Arguments.of("(?=ab)ab", "ab"),
+            // Backreference — brics treats \1 as literal `1`, not a group reference.
+            Arguments.of("(a)\\1", "aa"),
+            // Inline flag — brics doesn't strip (?i), so `?i` leaks into output.
+            Arguments.of("(?i)abc", "[Aa][Bb][Cc]"),
+            // Word boundary — brics treats \b as escaped `b`.
+            Arguments.of("\\babc", "abc"),
+            // Character-class intersection — brics doesn't honor && inside a class.
+            Arguments.of("[a-z&&[^aeiou]]", "[b-df-hj-np-tv-z]"),
+            // Octal escape — brics treats \012 as literal `012`. Workaround: embed the actual char.
+            Arguments.of("\\012", "\u000A"),
+            // Hex escape — brics treats \x1F as literal `x1F`. Workaround: embed the actual char.
+            Arguments.of("\\x1F", "\u001F"),
+            // Control escape — brics treats \cX as literal `cX`. Workaround: embed the actual char.
+            Arguments.of("\\cX", "\u0018"),
+            // Brics operators that Java treats as literals — escape them.
+            Arguments.of("abc&def", "abc\\&def"),
+            Arguments.of("abc#def", "abc\\#def"),
+            Arguments.of("<10-99>", "\\<10-99\\>"),
+        )
+
+        @JvmStatic
+        fun bricsSpecialEscapeArgs() = Stream.of(
+            // The brics-special operators from LIMITATIONS.md must round-trip when escaped.
+            Arguments.of("\\&", "&"),
+            Arguments.of("\\~", "~"),
+            Arguments.of("\\#", "#"),
+            Arguments.of("\\@", "@"),
         )
     }
 }
